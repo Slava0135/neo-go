@@ -180,10 +180,10 @@ func TestProcessCover_BlockOverlap(t *testing.T) {
 			require.Equal(t, 1, len(documentCover))
 			expectedBlock := tc.mdi.SeqPoints[0]
 			actualBlock := documentCover[0]
-			require.Equal(t, actualBlock.startLine, expectedBlock.StartLine)
-			require.Equal(t, actualBlock.endLine, expectedBlock.EndLine)
-			require.Equal(t, actualBlock.startCol, expectedBlock.StartCol)
-			require.Equal(t, actualBlock.endCol, expectedBlock.EndCol)
+			require.Equal(t, actualBlock.startLine, uint(expectedBlock.StartLine))
+			require.Equal(t, actualBlock.endLine, uint(expectedBlock.EndLine))
+			require.Equal(t, actualBlock.startCol, uint(expectedBlock.StartCol))
+			require.Equal(t, actualBlock.endCol, uint(expectedBlock.EndCol))
 		})
 	}
 
