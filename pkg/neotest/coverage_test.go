@@ -273,4 +273,29 @@ func TestProcessCover_BlockOverlap(t *testing.T) {
 		documentCover := cover[doc]
 		require.Equal(t, 2, len(documentCover))
 	})
+
+	t.Run("Same intervals", func(t *testing.T) {
+		t.Cleanup(resetCoverage)
+
+		scriptHash := util.Uint160{1}
+		doc := "foobar.go"
+		mdi := compiler.MethodDebugInfo{
+			SeqPoints: []compiler.DebugSeqPoint{
+				{Opcode: 0, Document: 0},
+				{Opcode: 1, Document: 0},
+			},
+		}
+		di := &compiler.DebugInfo{
+			Documents: []string{doc},
+			Methods:   []compiler.MethodDebugInfo{mdi},
+		}
+		contract := &Contract{Hash: scriptHash, DebugInfo: di}
+	
+		addScriptToCoverage(contract)
+		cover := processCover()
+
+		require.Contains(t, cover, doc)
+		documentCover := cover[doc]
+		require.Equal(t, 1, len(documentCover))
+	})
 }

@@ -202,6 +202,8 @@ func documentSeqPoints(di *compiler.DebugInfo, doc documentName) []compiler.Debu
 	return res
 }
 
+// resolveOverlaps removes overlaps from debug points.
+// Its assumed that intervals can never overlap partially.
 func resolveOverlaps(points []compiler.DebugSeqPoint) []compiler.DebugSeqPoint {
 	type Interval struct {
 		start  int
@@ -210,14 +212,16 @@ func resolveOverlaps(points []compiler.DebugSeqPoint) []compiler.DebugSeqPoint {
 		remove bool
 	}
 	var intervals []Interval
-	// expected maximum characters per line. Its more effective and easier to assume this, than to compare columns directly.
+	// expected maximum characters per line. Its more effective and easier to assume this, than to compare columns.
 	const maxColN = 1000
 	for i, p := range points {
 		intervals = append(intervals, Interval{start: p.StartLine * maxColN + p.StartCol, end: p.EndLine * maxColN + p.EndCol, origin: i})
 	}
 	for i := range intervals {
 		for j := range intervals {
-			if i == j || intervals[j].remove {
+			// if interval 'i' is already removed than there exists an even smaller interval that is also included by 'j'.
+			// this also makes it so if there are 2 equal interval then at least 1 will remain.
+			if i == j || intervals[i].remove {
 				continue
 			}
 			if intervals[j].start <= intervals[i].start && intervals[i].end <= intervals[j].end {
