@@ -171,10 +171,10 @@ func TestProcessCover_BlockOverlap(t *testing.T) {
 				Methods:   []compiler.MethodDebugInfo{tc.mdi},
 			}
 			contract := &Contract{Hash: scriptHash, DebugInfo: di}
-		
+
 			addScriptToCoverage(contract)
 			cover := processCover()
-		
+
 			require.Contains(t, cover, doc)
 			documentCover := cover[doc]
 			require.Equal(t, 1, len(documentCover))
@@ -204,7 +204,7 @@ func TestProcessCover_BlockOverlap(t *testing.T) {
 			Methods:   []compiler.MethodDebugInfo{mdi},
 		}
 		contract := &Contract{Hash: scriptHash, DebugInfo: di}
-	
+
 		addScriptToCoverage(contract)
 		cover := processCover()
 
@@ -265,7 +265,7 @@ func TestProcessCover_BlockOverlap(t *testing.T) {
 			Methods:   []compiler.MethodDebugInfo{mdi},
 		}
 		contract := &Contract{Hash: scriptHash, DebugInfo: di}
-	
+
 		addScriptToCoverage(contract)
 		cover := processCover()
 
@@ -290,7 +290,7 @@ func TestProcessCover_BlockOverlap(t *testing.T) {
 			Methods:   []compiler.MethodDebugInfo{mdi},
 		}
 		contract := &Contract{Hash: scriptHash, DebugInfo: di}
-	
+
 		addScriptToCoverage(contract)
 		cover := processCover()
 

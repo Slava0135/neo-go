@@ -174,7 +174,9 @@ func processCover() map[documentName][]coverBlock {
 			for _, offset := range scriptRawCoverage.offsetsVisited {
 				for _, point := range documentSeqPoints {
 					if point.Opcode == offset {
-						mappedBlocks[point.Opcode].counts++
+						if _, ok := mappedBlocks[offset]; ok {
+							mappedBlocks[offset].counts++
+						}
 					}
 				}
 			}
@@ -215,7 +217,7 @@ func resolveOverlaps(points []compiler.DebugSeqPoint) []compiler.DebugSeqPoint {
 	// expected maximum characters per line. Its more effective and easier to assume this, than to compare columns.
 	const maxColN = 1000
 	for i, p := range points {
-		intervals = append(intervals, Interval{start: p.StartLine * maxColN + p.StartCol, end: p.EndLine * maxColN + p.EndCol, origin: i})
+		intervals = append(intervals, Interval{start: p.StartLine*maxColN + p.StartCol, end: p.EndLine*maxColN + p.EndCol, origin: i})
 	}
 	for i := range intervals {
 		for j := range intervals {
