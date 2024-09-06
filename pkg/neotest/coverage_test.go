@@ -9,7 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func resetCoverage() {
+	rawCoverage = make(map[util.Uint160]*scriptRawCoverage)
+}
+
 func TestProcessCover_OneMethodOneDocument(t *testing.T) {
+	t.Cleanup(resetCoverage)
+
 	scriptHash := util.Uint160{1}
 	doc := "foobar.go"
 	mdi := compiler.MethodDebugInfo{
@@ -40,6 +46,8 @@ func TestProcessCover_OneMethodOneDocument(t *testing.T) {
 }
 
 func TestProcessCover_TwoMethodsTwoDocuments(t *testing.T) {
+	t.Cleanup(resetCoverage)
+
 	scriptHash1 := util.Uint160{1}
 	scriptHash2 := util.Uint160{2}
 	doc1 := "contract1.go"
