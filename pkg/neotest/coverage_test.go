@@ -23,7 +23,7 @@ func TestProcessCover_OneMethodOneDocument(t *testing.T) {
 		Documents: []string{doc},
 		Methods:   []compiler.MethodDebugInfo{mdi},
 	}
-	contract := &Contract{Hash: scriptHash, NEF: nil, Manifest: nil, DebugInfo: di}
+	contract := &Contract{Hash: scriptHash, DebugInfo: di}
 
 	addScriptToCoverage(contract)
 	coverageHook(scriptHash, 1, opcode.NOP)
