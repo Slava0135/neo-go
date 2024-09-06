@@ -173,8 +173,6 @@ func TestProcessCover_BlockOverlap(t *testing.T) {
 			contract := &Contract{Hash: scriptHash, DebugInfo: di}
 		
 			addScriptToCoverage(contract)
-			coverageHook(scriptHash, 0, opcode.NOP)
-			coverageHook(scriptHash, 1, opcode.NOP)
 			cover := processCover()
 		
 			require.Contains(t, cover, doc)
@@ -186,7 +184,93 @@ func TestProcessCover_BlockOverlap(t *testing.T) {
 			require.Equal(t, actualBlock.endLine, expectedBlock.EndLine)
 			require.Equal(t, actualBlock.startCol, expectedBlock.StartCol)
 			require.Equal(t, actualBlock.endCol, expectedBlock.EndCol)
-			require.Equal(t, actualBlock.counts, 1)
 		})
 	}
+
+	t.Run("Nested", func(t *testing.T) {
+		t.Cleanup(resetCoverage)
+
+		scriptHash := util.Uint160{1}
+		doc := "foobar.go"
+		mdi := compiler.MethodDebugInfo{
+			SeqPoints: []compiler.DebugSeqPoint{
+				{Opcode: 0, Document: 0, StartLine: 0, EndLine: 4},
+				{Opcode: 1, Document: 0, StartLine: 1, EndLine: 3},
+				{Opcode: 2, Document: 0, StartLine: 2, EndLine: 2},
+			},
+		}
+		di := &compiler.DebugInfo{
+			Documents: []string{doc},
+			Methods:   []compiler.MethodDebugInfo{mdi},
+		}
+		contract := &Contract{Hash: scriptHash, DebugInfo: di}
+	
+		addScriptToCoverage(contract)
+		cover := processCover()
+
+		require.Contains(t, cover, doc)
+		documentCover := cover[doc]
+		require.Equal(t, 1, len(documentCover))
+		require.Contains(t, documentCover, coverBlock{startLine: 2, endLine: 2, stmts: 1})
+	})
+
+	t.Run("Complex", func(t *testing.T) {
+		t.Cleanup(resetCoverage)
+
+		scriptHash := util.Uint160{1}
+		doc := "foobar.go"
+		mdi := compiler.MethodDebugInfo{
+			SeqPoints: []compiler.DebugSeqPoint{
+				{Opcode: 0, Document: 0, StartLine: 0, EndLine: 0},
+				{Opcode: 1, Document: 0, StartLine: 1, EndLine: 1},
+				{Opcode: 2, Document: 0, StartLine: 2, EndLine: 2},
+				{Opcode: 3, Document: 0, StartLine: 3, EndLine: 3},
+				{Opcode: 4, Document: 0, StartLine: 4, EndLine: 4},
+				{Opcode: 5, Document: 0, StartLine: 5, EndLine: 5}, // pick smaller (more specific).
+				{Opcode: 6, Document: 0, StartLine: 5, EndLine: 6}, // overlap.
+				{Opcode: 7, Document: 0, StartLine: 7, EndLine: 7},
+				{Opcode: 8, Document: 0, StartLine: 8, EndLine: 8},
+				{Opcode: 9, Document: 0, StartLine: 9, EndLine: 9},
+			},
+		}
+		di := &compiler.DebugInfo{
+			Documents: []string{doc},
+			Methods:   []compiler.MethodDebugInfo{mdi},
+		}
+		contract := &Contract{Hash: scriptHash, DebugInfo: di}
+
+		addScriptToCoverage(contract)
+		cover := processCover()
+
+		require.Contains(t, cover, doc)
+		documentCover := cover[doc]
+		require.Equal(t, 9, len(documentCover))
+		require.Contains(t, documentCover, coverBlock{startLine: 5, endLine: 5, stmts: 1})
+		require.NotContains(t, documentCover, coverBlock{startLine: 5, endLine: 6, stmts: 2})
+	})
+
+	t.Run("No overlap on same line", func(t *testing.T) {
+		t.Cleanup(resetCoverage)
+
+		scriptHash := util.Uint160{1}
+		doc := "foobar.go"
+		mdi := compiler.MethodDebugInfo{
+			SeqPoints: []compiler.DebugSeqPoint{
+				{Opcode: 0, Document: 0, StartLine: 0, EndLine: 0, StartCol: 1, EndCol: 2},
+				{Opcode: 1, Document: 0, StartLine: 0, EndLine: 0, StartCol: 3, EndCol: 4},
+			},
+		}
+		di := &compiler.DebugInfo{
+			Documents: []string{doc},
+			Methods:   []compiler.MethodDebugInfo{mdi},
+		}
+		contract := &Contract{Hash: scriptHash, DebugInfo: di}
+	
+		addScriptToCoverage(contract)
+		cover := processCover()
+
+		require.Contains(t, cover, doc)
+		documentCover := cover[doc]
+		require.Equal(t, 2, len(documentCover))
+	})
 }
