@@ -150,27 +150,27 @@ func processCover() map[documentName][]coverBlock {
 	for documentName := range documents {
 		mappedBlocks := make(map[int]*coverBlock)
 
+		var allDocumentSeqPoints []compiler.DebugSeqPoint
 		for _, scriptRawCoverage := range rawCoverage {
-			di := scriptRawCoverage.debugInfo
-			documentSeqPoints := documentSeqPoints(di, documentName)
+			documentSeqPoints := documentSeqPoints(scriptRawCoverage.debugInfo, documentName)
+			allDocumentSeqPoints = append(allDocumentSeqPoints, documentSeqPoints...)
+		}
+		allDocumentSeqPoints = resolveOverlaps(allDocumentSeqPoints)
 
-			for _, point := range documentSeqPoints {
-				b := coverBlock{
-					startLine: uint(point.StartLine),
-					startCol:  uint(point.StartCol),
-					endLine:   uint(point.EndLine),
-					endCol:    uint(point.EndCol),
-					stmts:     1 + uint(point.EndLine) - uint(point.StartLine),
-					counts:    0,
-				}
-				mappedBlocks[point.Opcode] = &b
+		for _, point := range allDocumentSeqPoints {
+			b := coverBlock{
+				startLine: uint(point.StartLine),
+				startCol:  uint(point.StartCol),
+				endLine:   uint(point.EndLine),
+				endCol:    uint(point.EndCol),
+				stmts:     1 + uint(point.EndLine) - uint(point.StartLine),
+				counts:    0,
 			}
+			mappedBlocks[point.Opcode] = &b
 		}
 
 		for _, scriptRawCoverage := range rawCoverage {
-			di := scriptRawCoverage.debugInfo
-			documentSeqPoints := documentSeqPoints(di, documentName)
-
+			documentSeqPoints := documentSeqPoints(scriptRawCoverage.debugInfo, documentName)
 			for _, offset := range scriptRawCoverage.offsetsVisited {
 				for _, point := range documentSeqPoints {
 					if point.Opcode == offset {
@@ -197,6 +197,38 @@ func documentSeqPoints(di *compiler.DebugInfo, doc documentName) []compiler.Debu
 			if di.Documents[p.Document] == doc {
 				res = append(res, p)
 			}
+		}
+	}
+	return res
+}
+
+func resolveOverlaps(points []compiler.DebugSeqPoint) []compiler.DebugSeqPoint {
+	type Interval struct {
+		start  int
+		end    int
+		origin int
+		remove bool
+	}
+	var intervals []Interval
+	// expected maximum characters per line. Its more effective and easier to assume this, than to compare columns directly.
+	const maxColN = 1000
+	for i, p := range points {
+		intervals = append(intervals, Interval{start: p.StartLine * maxColN + p.StartCol, end: p.EndLine * maxColN + p.EndCol, origin: i})
+	}
+	for i := range intervals {
+		for j := range intervals {
+			if i == j || intervals[j].remove {
+				continue
+			}
+			if intervals[j].start <= intervals[i].start && intervals[i].end <= intervals[j].end {
+				intervals[j].remove = true
+			}
+		}
+	}
+	var res []compiler.DebugSeqPoint
+	for _, v := range intervals {
+		if !v.remove {
+			res = append(res, points[v.origin])
 		}
 	}
 	return res
