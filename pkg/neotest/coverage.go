@@ -59,6 +59,12 @@ type coverBlock struct {
 // documentName makes it clear when a `string` maps path to the script file.
 type documentName = string
 
+type interval struct {
+	compiler.DebugSeqPoint
+	origin int
+	remove bool
+}
+
 func isCoverageEnabled() bool {
 	coverageLock.Lock()
 	defer coverageLock.Unlock()
@@ -207,28 +213,29 @@ func documentSeqPoints(di *compiler.DebugInfo, doc documentName) []compiler.Debu
 // resolveOverlaps removes overlaps from debug points.
 // Its assumed that intervals can never overlap partially.
 func resolveOverlaps(points []compiler.DebugSeqPoint) []compiler.DebugSeqPoint {
-	type Interval struct {
-		start  int
-		end    int
-		origin int
-		remove bool
-	}
-	var intervals []Interval
+	var intervals []interval
 	// expected maximum characters per line. Its more effective and easier to assume this, than to compare columns.
-	const maxColN = 1000
 	for i, p := range points {
-		intervals = append(intervals, Interval{start: p.StartLine*maxColN + p.StartCol, end: p.EndLine*maxColN + p.EndCol, origin: i})
+		intervals = append(intervals, interval{DebugSeqPoint: p, origin: i})
 	}
 	for i := range intervals {
 		for j := range intervals {
+			inner := &intervals[i]
+			outer := &intervals[j]
 			// if interval 'i' is already removed than there exists an even smaller interval that is also included by 'j'.
-			// this also makes it so if there are 2 equal interval then at least 1 will remain.
-			if i == j || intervals[i].remove {
+			// This also ensures that if there are 2 equal interval then at least 1 will remain.
+			if i == j || inner.remove {
 				continue
 			}
-			if intervals[j].start <= intervals[i].start && intervals[i].end <= intervals[j].end {
-				intervals[j].remove = true
+			// outer interval start must be before inner interval start
+			if !(outer.StartLine < inner.StartLine || outer.StartLine == inner.StartLine && outer.StartCol <= inner.StartCol) {
+				continue
 			}
+			// outer interval end must be after inner interval end
+			if !(outer.EndLine > inner.EndLine || outer.EndLine == inner.EndLine && outer.EndCol >= inner.EndCol) {
+				continue
+			}
+			outer.remove = true
 		}
 	}
 	var res []compiler.DebugSeqPoint
