@@ -61,7 +61,6 @@ type documentName = string
 
 type interval struct {
 	compiler.DebugSeqPoint
-	origin int
 	remove bool
 }
 
@@ -215,8 +214,8 @@ func documentSeqPoints(di *compiler.DebugInfo, doc documentName) []compiler.Debu
 func resolveOverlaps(points []compiler.DebugSeqPoint) []compiler.DebugSeqPoint {
 	var intervals []interval
 	// expected maximum characters per line. Its more effective and easier to assume this, than to compare columns.
-	for i, p := range points {
-		intervals = append(intervals, interval{DebugSeqPoint: p, origin: i})
+	for _, p := range points {
+		intervals = append(intervals, interval{DebugSeqPoint: p})
 	}
 	for i := range intervals {
 		for j := range intervals {
@@ -239,9 +238,9 @@ func resolveOverlaps(points []compiler.DebugSeqPoint) []compiler.DebugSeqPoint {
 		}
 	}
 	var res []compiler.DebugSeqPoint
-	for _, v := range intervals {
+	for i, v := range intervals {
 		if !v.remove {
-			res = append(res, points[v.origin])
+			res = append(res, points[i])
 		}
 	}
 	return res
