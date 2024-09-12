@@ -213,7 +213,6 @@ func documentSeqPoints(di *compiler.DebugInfo, doc documentName) []compiler.Debu
 // Its assumed that intervals can never overlap partially.
 func resolveOverlaps(points []compiler.DebugSeqPoint) []compiler.DebugSeqPoint {
 	var intervals []interval
-	// expected maximum characters per line. Its more effective and easier to assume this, than to compare columns.
 	for _, p := range points {
 		intervals = append(intervals, interval{DebugSeqPoint: p})
 	}
