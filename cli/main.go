@@ -9,11 +9,11 @@ import (
 )
 
 const (
-	vmHaltedCode    = 0
-	wrongArgCode    = 1
-	wrongStringCode = 2
-	runErrorCode    = 3
-	vmFailedCode    = 4
+	vmHaltedCode = 0
+	wrongArgCode = 1
+	wrongStrCode = 2
+	runErrorCode = 3
+	vmFailedCode = 4
 )
 
 func main() {
@@ -25,7 +25,7 @@ func main() {
 	script, err := base64.StdEncoding.DecodeString(string(args[0]))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error when decoding string (base64): %s\n", err)
-		os.Exit(wrongStringCode)
+		os.Exit(wrongStrCode)
 	}
 	vm := vm.New()
 	vm.LoadScript(script)
