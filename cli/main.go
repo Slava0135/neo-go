@@ -1,46 +1,50 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/nspcc-dev/neo-go/pkg/vm"
 )
 
-const (
-	vmHaltedCode = 0
-	wrongArgCode = 1
-	wrongStrCode = 2
-	runErrorCode = 3
-	vmFailedCode = 4
-)
+type Result struct {
+	status string
+	errmsg string
+	estack string
+}
 
 func main() {
+	res := run()
+	msg := fmt.Sprintf("{\"status\":\"%s\",\"errmsg\":\"%s\",\"estack\":%s}", res.status, res.errmsg, res.estack)
+	var out bytes.Buffer
+	err := json.Indent(&out, []byte(msg), "", "  ")
+	if err != nil {
+		panic("error when indenting json: " + err.Error())
+	}
+	out.WriteTo(os.Stdout)
+}
+
+func run() Result {
 	args := os.Args[1:]
 	if len(args) != 1 {
-		fmt.Fprintf(os.Stderr, "expected string (base64) as argument\n")
-		os.Exit(wrongArgCode)
+		return Result{status: "argument error", errmsg: "invalid number of arguments", estack: "[]"}
 	}
 	script, err := base64.StdEncoding.DecodeString(string(args[0]))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error when decoding string (base64): %s\n", err)
-		os.Exit(wrongStrCode)
+		return Result{status: "decoding error", errmsg: fmt.Sprintf("invalid base64 string: %s", err), estack: "[]"}
 	}
 	vm := vm.New()
 	vm.LoadScript(script)
 	err = vm.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error when running script: %s\n", err)
-		os.Exit(runErrorCode)
+		return Result{status: "VM error", errmsg: fmt.Sprintf("%s", err), estack: "[]"}
 	}
 	switch {
-	case vm.HasFailed():
-		fmt.Println("result: VM failed")
-		os.Exit(vmFailedCode)
 	case vm.HasHalted():
-		fmt.Println("result: VM halted")
-		fmt.Println(vm.DumpEStack())
-		os.Exit(vmHaltedCode)
+		return Result{status: "VM halted", errmsg: "", estack: vm.DumpEStack()}
 	}
+	panic("unknown state")
 }
