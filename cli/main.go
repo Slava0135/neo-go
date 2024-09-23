@@ -22,7 +22,6 @@ type Result struct {
 func main() {
 	res := run()
 	msg := fmt.Sprintf("{\"status\":\"%s\",\"errmsg\":\"%s\",\"lastop\":%d,\"estack\":%s}", res.status, res.errmsg, res.lastop, res.estack)
-	fmt.Println(msg)
 	var out bytes.Buffer
 	err := json.Indent(&out, []byte(msg), "", "  ")
 	if err != nil {
