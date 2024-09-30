@@ -34,7 +34,7 @@ build: deps
 	@set -x \
 		&& export GOGC=off \
 		&& export CGO_ENABLED=0 \
-		&& go build -trimpath -v -ldflags $(BUILD_FLAGS) -o ${BINARY_PATH} ./cli/main.go
+		&& go build -cover -trimpath -v -ldflags $(BUILD_FLAGS) -o ${BINARY_PATH} ./cli/main.go
 
 $(BINARY): build
 
