@@ -21,7 +21,7 @@ type Result struct {
 
 func main() {
 	res := run()
-	msg := fmt.Sprintf("{\"status\":\"%s\",\"errmsg\":\"%s\",\"lastop\":%d,\"estack\":%s}", res.status, res.errmsg, res.lastop, res.estack)
+	msg := fmt.Sprintf("{\"status\":\"%s\",\"errmsg\":\"%s\",\"lastop\":%d,\"estack\":%s}", res.status, jsonEscape(res.errmsg), res.lastop, res.estack)
 	var out bytes.Buffer
 	err := json.Indent(&out, []byte(msg), "", "  ")
 	if err != nil {
@@ -54,4 +54,13 @@ func run() Result {
 		return Result{status: "VM halted", errmsg: "", lastop: lastop, estack: vm.DumpEStack()}
 	}
 	panic("unknown state")
+}
+
+func jsonEscape(i string) string {
+    b, err := json.Marshal(i)
+    if err != nil {
+        panic(err)
+    }
+    // Trim the beginning and trailing " character
+    return string(b[1:len(b)-1])
 }
