@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/nspcc-dev/neo-go/cli/cmdargs"
 	"github.com/nspcc-dev/neo-go/cli/flags"
 	"github.com/nspcc-dev/neo-go/cli/options"
 	"github.com/nspcc-dev/neo-go/cli/txctx"
@@ -32,6 +33,77 @@ func NewCommands() []*cli.Command {
 		txctx.AwaitFlag,
 	}, options.RPC...)
 	txCancelFlags = append(txCancelFlags, options.Wallet...)
+	uploadBinFlags := append([]cli.Flag{
+		&cli.StringSliceFlag{
+			Name:     "fs-rpc-endpoint",
+			Aliases:  []string{"fsr"},
+			Usage:    "List of NeoFS storage node RPC addresses (comma-separated or multiple --fs-rpc-endpoint flags)",
+			Required: true,
+			Action: func(ctx *cli.Context, fsRpcEndpoints []string) error {
+				for _, endpoint := range fsRpcEndpoints {
+					if endpoint == "" {
+						return cli.Exit("NeoFS RPC endpoint cannot contain empty values", 1)
+					}
+				}
+				return nil
+			},
+		},
+		&cli.StringFlag{
+			Name:     "container",
+			Aliases:  []string{"cid"},
+			Usage:    "NeoFS container ID to upload blocks to",
+			Required: true,
+			Action:   cmdargs.EnsureNotEmpty("container"),
+		},
+		&cli.StringFlag{
+			Name:     "block-attribute",
+			Usage:    "Attribute key of the block object",
+			Required: true,
+			Action:   cmdargs.EnsureNotEmpty("block-attribute"),
+		},
+		&cli.StringFlag{
+			Name:     "index-attribute",
+			Usage:    "Attribute key of the index file object",
+			Required: true,
+			Action:   cmdargs.EnsureNotEmpty("index-attribute"),
+		},
+		&flags.AddressFlag{
+			Name:  "address",
+			Usage: "Address to use for signing the uploading and searching transactions in NeoFS",
+		},
+		&cli.UintFlag{
+			Name:  "index-file-size",
+			Usage: "Size of index file",
+			Value: 128000,
+		},
+		&cli.UintFlag{
+			Name:  "workers",
+			Usage: "Number of workers to fetch and upload blocks concurrently",
+			Value: 50,
+		},
+		&cli.UintFlag{
+			Name:  "searchers",
+			Usage: "Number of concurrent searches for blocks",
+			Value: 20,
+		},
+		&cli.BoolFlag{
+			Name:  "skip-blocks-uploading",
+			Usage: "Skip blocks uploading and upload only index files",
+		},
+		&cli.UintFlag{
+			Name:  "retries",
+			Usage: "Maximum number of Neo/NeoFS node request retries",
+			Value: 5,
+			Action: func(context *cli.Context, u uint) error {
+				if u < 1 {
+					return cli.Exit("retries should be greater than 0", 1)
+				}
+				return nil
+			},
+		},
+		options.Debug,
+	}, options.RPC...)
+	uploadBinFlags = append(uploadBinFlags, options.Wallet...)
 	return []*cli.Command{
 		{
 			Name:  "util",
@@ -108,6 +180,13 @@ func NewCommands() []*cli.Command {
 							Usage: "Use hex encoding and do not check base64",
 						},
 					},
+				},
+				{
+					Name:      "upload-bin",
+					Usage:     "Fetch blocks from RPC node and upload them to the NeoFS container",
+					UsageText: "neo-go util upload-bin --fs-rpc-endpoint <address1>[,<address2>[...]] --container <cid> --block-attribute block --index-attribute index --rpc-endpoint <node> [--timeout <time>] --wallet <wallet> [--wallet-config <config>] [--address <address>] [--workers <num>] [--searchers <num>] [--index-file-size <size>] [--skip-blocks-uploading] [--retries <num>] [--debug]",
+					Action:    uploadBin,
+					Flags:     uploadBinFlags,
 				},
 			},
 		},

@@ -111,6 +111,26 @@ Example:
 		Action: handleBreak,
 	},
 	{
+		Name:      "delete",
+		Usage:     "Remove a breakpoint",
+		UsageText: `delete <ip>`,
+		Description: `<ip> is mandatory parameter.
+
+Example:
+> delete 12`,
+		Action: handleRemoveBreak,
+	},
+	{
+		Name:      "ib",
+		Usage:     "List breakpoints",
+		UsageText: `ib`,
+		Description: `List breakpoints. 
+
+Example:
+> ib`,
+		Action: handleListBreak,
+	},
+	{
 		Name:      "jump",
 		Usage:     "Jump to the specified instruction (absolute IP value)",
 		UsageText: `jump <ip>`,
@@ -597,6 +617,33 @@ func handleBreak(c *cli.Context) error {
 	return nil
 }
 
+func handleRemoveBreak(c *cli.Context) error {
+	if !checkVMIsReady(c.App) {
+		return nil
+	}
+	n, err := getInstructionParameter(c)
+	if err != nil {
+		return err
+	}
+
+	v := getVMFromContext(c.App)
+	v.RemoveBreakPoint(n)
+	fmt.Fprintf(c.App.Writer, "breakpoint removed at instruction %d\n", n)
+	return nil
+}
+
+func handleListBreak(c *cli.Context) error {
+	if !checkVMIsReady(c.App) {
+		return nil
+	}
+
+	v := getVMFromContext(c.App)
+	for _, bp := range v.Context().BreakPoints() {
+		fmt.Fprintf(c.App.Writer, "%d\n", bp)
+	}
+	return nil
+}
+
 func handleJump(c *cli.Context) error {
 	if !checkVMIsReady(c.App) {
 		return nil
@@ -648,16 +695,24 @@ func handleSlots(c *cli.Context) error {
 	var rawSlot string
 	switch c.Command.Name {
 	case "sslot":
-		rawSlot = vmCtx.DumpStaticSlot()
+		rawSlot = dumpSlot(vmCtx.StaticsSlot())
 	case "lslot":
-		rawSlot = vmCtx.DumpLocalSlot()
+		rawSlot = dumpSlot(vmCtx.LocalsSlot())
 	case "aslot":
-		rawSlot = vmCtx.DumpArgumentsSlot()
+		rawSlot = dumpSlot(vmCtx.ArgumentsSlot())
 	default:
 		return errors.New("unknown slot")
 	}
 	fmt.Fprintln(c.App.Writer, rawSlot)
 	return nil
+}
+
+func dumpSlot(s *vm.Slot) string {
+	if s == nil {
+		return "[]"
+	}
+	b, _ := json.MarshalIndent(s, "", "    ")
+	return string(b)
 }
 
 // prepareVM retrieves --historic flag from context (if set) and resets app state

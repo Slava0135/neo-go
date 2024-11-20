@@ -275,6 +275,14 @@ func (v *VM) AddBreakPoint(n int) {
 	ctx.sc.breakPoints = append(ctx.sc.breakPoints, n)
 }
 
+// RemoveBreakPoint removes the breakpoint in the current context.
+func (v *VM) RemoveBreakPoint(n int) {
+	ctx := v.Context()
+	ctx.sc.breakPoints = slices.DeleteFunc(ctx.sc.breakPoints, func(i int) bool {
+		return i == n
+	})
+}
+
 // AddBreakPointRel adds a breakpoint relative to the current
 // instruction pointer.
 func (v *VM) AddBreakPointRel(n int) {
@@ -697,7 +705,7 @@ func (v *VM) execute(ctx *Context, op opcode.Opcode, parameter []byte) (err erro
 			sz := int(parameter[1])
 			ctx.arguments.init(sz, &v.refs)
 			for i := range sz {
-				ctx.arguments.Set(i, v.estack.Pop().Item(), &v.refs)
+				ctx.arguments.set(i, v.estack.Pop().Item(), &v.refs)
 			}
 		}
 
@@ -711,11 +719,11 @@ func (v *VM) execute(ctx *Context, op opcode.Opcode, parameter []byte) (err erro
 
 	case opcode.STSFLD0, opcode.STSFLD1, opcode.STSFLD2, opcode.STSFLD3, opcode.STSFLD4, opcode.STSFLD5, opcode.STSFLD6:
 		item := v.estack.Pop().Item()
-		ctx.sc.static.Set(int(op-opcode.STSFLD0), item, &v.refs)
+		ctx.sc.static.set(int(op-opcode.STSFLD0), item, &v.refs)
 
 	case opcode.STSFLD:
 		item := v.estack.Pop().Item()
-		ctx.sc.static.Set(int(parameter[0]), item, &v.refs)
+		ctx.sc.static.set(int(parameter[0]), item, &v.refs)
 
 	case opcode.LDLOC0, opcode.LDLOC1, opcode.LDLOC2, opcode.LDLOC3, opcode.LDLOC4, opcode.LDLOC5, opcode.LDLOC6:
 		item := ctx.local.Get(int(op - opcode.LDLOC0))
@@ -727,11 +735,11 @@ func (v *VM) execute(ctx *Context, op opcode.Opcode, parameter []byte) (err erro
 
 	case opcode.STLOC0, opcode.STLOC1, opcode.STLOC2, opcode.STLOC3, opcode.STLOC4, opcode.STLOC5, opcode.STLOC6:
 		item := v.estack.Pop().Item()
-		ctx.local.Set(int(op-opcode.STLOC0), item, &v.refs)
+		ctx.local.set(int(op-opcode.STLOC0), item, &v.refs)
 
 	case opcode.STLOC:
 		item := v.estack.Pop().Item()
-		ctx.local.Set(int(parameter[0]), item, &v.refs)
+		ctx.local.set(int(parameter[0]), item, &v.refs)
 
 	case opcode.LDARG0, opcode.LDARG1, opcode.LDARG2, opcode.LDARG3, opcode.LDARG4, opcode.LDARG5, opcode.LDARG6:
 		item := ctx.arguments.Get(int(op - opcode.LDARG0))
@@ -743,11 +751,11 @@ func (v *VM) execute(ctx *Context, op opcode.Opcode, parameter []byte) (err erro
 
 	case opcode.STARG0, opcode.STARG1, opcode.STARG2, opcode.STARG3, opcode.STARG4, opcode.STARG5, opcode.STARG6:
 		item := v.estack.Pop().Item()
-		ctx.arguments.Set(int(op-opcode.STARG0), item, &v.refs)
+		ctx.arguments.set(int(op-opcode.STARG0), item, &v.refs)
 
 	case opcode.STARG:
 		item := v.estack.Pop().Item()
-		ctx.arguments.Set(int(parameter[0]), item, &v.refs)
+		ctx.arguments.set(int(parameter[0]), item, &v.refs)
 
 	case opcode.NEWBUFFER:
 		n := toInt(v.estack.Pop().BigInt())
@@ -914,6 +922,7 @@ func (v *VM) execute(ctx *Context, op opcode.Opcode, parameter []byte) (err erro
 			n = 4
 		case opcode.REVERSEN:
 			n = toInt(v.estack.Pop().BigInt())
+		default:
 		}
 		if err := v.estack.ReverseTop(n); err != nil {
 			panic(err.Error())
@@ -1029,7 +1038,7 @@ func (v *VM) execute(ctx *Context, op opcode.Opcode, parameter []byte) (err erro
 		x1 := v.estack.Pop().BigInt()
 
 		res := new(big.Int).Mul(x1, x2)
-		v.estack.PushItem(stackitem.NewBigInteger(res.Mod(res, modulus)))
+		v.estack.PushItem(stackitem.NewBigInteger(res.Rem(res, modulus)))
 
 	case opcode.MODPOW:
 		modulus := v.estack.Pop().BigInt()
@@ -1054,6 +1063,12 @@ func (v *VM) execute(ctx *Context, op opcode.Opcode, parameter []byte) (err erro
 				panic("zero modulus") // https://docs.microsoft.com/en-us/dotnet/api/system.numerics.biginteger.modpow?view=net-6.0#exceptions
 			}
 			res.Exp(base, exponent, modulus)
+
+			// https://github.com/nspcc-dev/neo-go/issues/3612
+			if base.Sign() < 0 && exponent.Bit(0) == 1 && res.Sign() != 0 {
+				absModulus := new(big.Int).Abs(modulus)
+				res.Sub(res, absModulus)
+			}
 		}
 
 		v.estack.PushItem(stackitem.NewBigInteger(res))
@@ -1122,6 +1137,7 @@ func (v *VM) execute(ctx *Context, op opcode.Opcode, parameter []byte) (err erro
 				res = cmp == 1
 			case opcode.GE:
 				res = cmp >= 0
+			default:
 			}
 		}
 		v.estack.PushItem(stackitem.Bool(res))
@@ -1198,15 +1214,16 @@ func (v *VM) execute(ctx *Context, op opcode.Opcode, parameter []byte) (err erro
 			panic("invalid length")
 		}
 
-		items := make([]stackitem.MapElement, n)
-		for i := range n {
+		m := stackitem.NewMap()
+		for range n {
 			key := v.estack.Pop()
-			validateMapKey(key)
 			val := v.estack.Pop().value
-			items[i].Key = key.value
-			items[i].Value = val
+			if key.Item() == nil {
+				panic("no key found")
+			}
+			m.Add(key.value, val)
 		}
-		v.estack.PushItem(stackitem.NewMapWithValue(items))
+		v.estack.PushItem(m)
 
 	case opcode.PACKSTRUCT, opcode.PACK:
 		n := toInt(v.estack.Pop().BigInt())
@@ -1443,7 +1460,6 @@ func (v *VM) execute(ctx *Context, op opcode.Opcode, parameter []byte) (err erro
 		case *stackitem.Struct:
 			item.Remove(index)
 		}
-		v.refs.Remove(elem)
 
 	case opcode.SIZE:
 		elem := v.estack.Pop()
@@ -1684,15 +1700,15 @@ func (v *VM) execute(ctx *Context, op opcode.Opcode, parameter []byte) (err erro
 
 func (v *VM) unloadContext(ctx *Context) {
 	if ctx.local != nil {
-		ctx.local.ClearRefs(&v.refs)
+		ctx.local.clearRefs(&v.refs)
 	}
 	if ctx.arguments != nil {
-		ctx.arguments.ClearRefs(&v.refs)
+		ctx.arguments.clearRefs(&v.refs)
 	}
 	currCtx := v.Context()
 	if currCtx == nil || ctx.sc != currCtx.sc {
 		if ctx.sc.static != nil {
-			ctx.sc.static.ClearRefs(&v.refs)
+			ctx.sc.static.clearRefs(&v.refs)
 		}
 		if ctx.sc.onUnload != nil {
 			err := ctx.sc.onUnload(v, ctx, v.uncaughtException == nil)

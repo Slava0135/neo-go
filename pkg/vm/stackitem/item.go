@@ -824,7 +824,8 @@ func NewMap() *Map {
 	}
 }
 
-// NewMapWithValue returns a new Map object filled with the specified value.
+// NewMapWithValue returns a new Map object filled with the specified value
+// without value validation.
 func NewMapWithValue(value []MapElement) *Map {
 	if value != nil {
 		return &Map{
@@ -1124,7 +1125,7 @@ func (p *Pointer) Position() int {
 	return p.pos
 }
 
-// Buffer represents represents a Buffer stack item.
+// Buffer represents a Buffer stack item.
 type Buffer []byte
 
 // NewBuffer returns a new Buffer object.

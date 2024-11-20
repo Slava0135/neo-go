@@ -738,19 +738,21 @@ func TestMODMUL(t *testing.T) {
 	t.Run("bad, zero mod", getTestFuncForVM(prog, nil, 1, 2, 0))
 	t.Run("good, positive base", getTestFuncForVM(prog, 2, 3, 4, 5))
 	t.Run("good, zero base", getTestFuncForVM(prog, 0, 0, 4, 5))
-	t.Run("good, negative base", getTestFuncForVM(prog, 3, -3, 4, 5))
+	t.Run("good, negative base", getTestFuncForVM(prog, -2, -3, 4, 5))
 	t.Run("good, positive base, negative mod", getTestFuncForVM(prog, 2, 3, 4, -5))
-	t.Run("good, negative base, negative mod", getTestFuncForVM(prog, 3, -3, 4, -5))
+	t.Run("good, negative base, negative mod", getTestFuncForVM(prog, -2, -3, 4, -5))
+	t.Run("good, positive base, negative multiplier, negative mod", getTestFuncForVM(prog, -9, 100, -1, -91))
 }
 
 func TestMODPOW(t *testing.T) {
 	prog := makeProgram(opcode.MODPOW)
 	t.Run("good, positive base", getTestFuncForVM(prog, 1, 3, 4, 5))
-	t.Run("good, negative base", getTestFuncForVM(prog, 2, -3, 5, 5))
+	t.Run("good, negative base", getTestFuncForVM(prog, -3, -3, 5, 5))
 	t.Run("good, positive base, negative mod", getTestFuncForVM(prog, 1, 3, 4, -5))
-	t.Run("good, negative base, negative mod", getTestFuncForVM(prog, 2, -3, 5, -5))
+	t.Run("good, negative base, negative mod", getTestFuncForVM(prog, -3, -3, 5, -5))
 	t.Run("bad, big negative exponent", getTestFuncForVM(prog, nil, 3, -2, 5))
 	t.Run("bad, zero modulus", getTestFuncForVM(prog, nil, 3, 4, 0))
+	t.Run("zero result, negative base, even exponent", getTestFuncForVM(prog, 0, -2, 3, 8))
 
 	t.Run("inverse compatibility", func(t *testing.T) { // Tests are taken from C# node.
 		t.Run("bad mod", getTestFuncForVM(prog, nil, 1, -1, 0))
@@ -759,6 +761,7 @@ func TestMODPOW(t *testing.T) {
 		t.Run("bad base", getTestFuncForVM(prog, nil, 0, -1, 1))
 		t.Run("no inverse exists", getTestFuncForVM(prog, nil, math.MaxUint16, -1, math.MaxUint8))
 		t.Run("good", getTestFuncForVM(prog, 52, 19, -1, 141))
+		t.Run("good", getTestFuncForVM(prog, 1, 5, -1, 4))
 	})
 }
 
@@ -2078,6 +2081,45 @@ func TestPACKMAPBadKey(t *testing.T) {
 func TestUNPACKBadNotArray(t *testing.T) {
 	prog := makeProgram(opcode.UNPACK)
 	runWithArgs(t, prog, nil, 1)
+}
+
+func TestPACKMAPDuplicateKeys(t *testing.T) {
+	prog := makeProgram(opcode.PACKMAP)
+	vm := load(prog)
+
+	keys := []string{"duplicateKey", "uniqueKey", "duplicateKey", "anotherUniqueKey"}
+	values := []string{"value1", "value2", "value3", "value4"}
+
+	for i := range keys {
+		vm.estack.PushVal(values[i])
+		vm.estack.PushVal(keys[i])
+	}
+
+	vm.estack.PushVal(len(keys))
+	runVM(t, vm)
+
+	require.Equal(t, 1, vm.estack.Len())
+	packedItem := vm.estack.Pop().Item()
+	require.Equal(t, stackitem.MapT, packedItem.Type())
+
+	packedMap := packedItem.(*stackitem.Map)
+	require.Equal(t, 3, packedMap.Len())
+
+	expected := []stackitem.MapElement{
+		{
+			Key:   stackitem.NewByteArray([]byte("anotherUniqueKey")),
+			Value: stackitem.NewByteArray([]byte("value4")),
+		},
+		{
+			Key:   stackitem.NewByteArray([]byte("duplicateKey")),
+			Value: stackitem.NewByteArray([]byte("value1")),
+		},
+		{
+			Key:   stackitem.NewByteArray([]byte("uniqueKey")),
+			Value: stackitem.NewByteArray([]byte("value2")),
+		},
+	}
+	require.Equal(t, expected, packedMap.Value())
 }
 
 func TestUNPACKGood(t *testing.T) {

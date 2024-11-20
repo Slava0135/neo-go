@@ -269,7 +269,7 @@ var rpcWsHandlers = map[string]func(*Server, params.Params, *subscriber) (any, *
 // New creates a new Server struct. Pay attention that orc is expected to be either
 // untyped nil or non-nil structure implementing OracleHandler interface.
 func New(chain Ledger, conf config.RPC, coreServer *network.Server,
-	orc OracleHandler, log *zap.Logger, errChan chan<- error) Server {
+	orc OracleHandler, log *zap.Logger, errChan chan<- error) *Server {
 	protoCfg := chain.GetConfig().ProtocolConfiguration
 	if conf.SessionEnabled {
 		if conf.SessionExpirationTime <= 0 {
@@ -339,7 +339,7 @@ func New(chain Ledger, conf config.RPC, coreServer *network.Server,
 		}
 	}
 
-	return Server{
+	return &Server{
 		http:  httpServers,
 		https: tlsServers,
 
@@ -2758,6 +2758,7 @@ func (s *Server) subscribe(reqParams params.Params, sub *subscriber) (any, *neor
 			flt := new(neorpc.ExecutionFilter)
 			err = jd.Decode(flt)
 			filter = *flt
+		default:
 		}
 		if err != nil {
 			return nil, neorpc.WrapErrorWithData(neorpc.ErrInvalidParams, err.Error())
@@ -2832,6 +2833,7 @@ func (s *Server) subscribeToChannel(event neorpc.EventID) {
 			s.chain.SubscribeForHeadersOfAddedBlocks(s.blockHeaderCh)
 		}
 		s.blockHeaderSubs++
+	default:
 	}
 }
 
@@ -2892,6 +2894,7 @@ func (s *Server) unsubscribeFromChannel(event neorpc.EventID) {
 		if s.blockHeaderSubs == 0 {
 			s.chain.UnsubscribeFromHeadersOfAddedBlocks(s.blockHeaderCh)
 		}
+	default:
 	}
 }
 
@@ -3096,12 +3099,6 @@ func (s *Server) writeHTTPServerResponse(r *params.Request, w http.ResponseWrite
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if s.config.EnableCORSWorkaround {
 		setCORSOriginHeaders(w.Header())
-	}
-	if r.In != nil {
-		resp := resp.(abstract)
-		if resp.Error != nil {
-			w.WriteHeader(getHTTPCodeForError(resp.Error))
-		}
 	}
 
 	encoder := json.NewEncoder(w)
